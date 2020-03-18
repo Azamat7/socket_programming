@@ -1,0 +1,6 @@
+docker run   --name ubuntu   -e HOST_IP=$(ifconfig en0 | awk '/ *inet /{print $2}')   -v /Users/mac/Desktop/socket:/src   -t -i   ubuntu /bin/bash
+
+docker exec -it ubuntu bash
+
+apt update
+apt-get install gcc
