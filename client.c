@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     char s[INET6_ADDRSTRLEN];
     
     int port;
-    int option;
+    int operation;
     int shift;
     char *host;
 
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
                 port = atoi(argv[++i]);
                 break;
             case 'o':
-                option= atoi(argv[++i]);
+                operation = atoi(argv[++i]);
                 break;
             case 's':
                 shift = atoi(argv[++i]);
@@ -66,11 +66,22 @@ int main(int argc, char *argv[])
         }
     }
 
+    int pSize = sysconf(_SC_PAGESIZE);
+    char *buffer = calloc(pSize, sizeof(char));
+    // assert(buffer);
+    int n;
+    do {
+        n = read(0, buffer, pSize);
+        // printf("%s\n", buffer);
+        // process it
+    } while(n > 0);
+    // return 0;
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(host, PORT, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
@@ -100,6 +111,9 @@ int main(int argc, char *argv[])
     printf("client: connecting to server \n");
 
     freeaddrinfo(servinfo); // all done with this structure
+
+    printf("%s\n", buffer);
+    send(sockfd , buffer , strlen(buffer) , 0 ); 
 
     if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) {
         perror("recv");

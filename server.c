@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
     char s[INET6_ADDRSTRLEN];
     int rv;
     int port;
+    char buffer[1024] = {0}; 
 
     if (argc != 3) { 
         printf("Usage: ./server -p PORT_NUMBER\n");
@@ -125,12 +126,20 @@ int main(int argc, char *argv[])
             continue;
         }
 
+        
+
         printf("server: got connection from the client\n");
 
         if (!fork()) { // this is the child process
             close(sockfd); // child doesn't need the listener
+
+            int valread;
+            valread = read(new_fd , buffer, 1024); 
+            printf("%s\n",buffer ); 
+            
             if (send(new_fd, "Hello, world!", 13, 0) == -1)
                 perror("send");
+                
             close(new_fd);
             exit(0);
         }
