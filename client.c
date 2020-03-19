@@ -21,12 +21,12 @@
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
 {
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+    return &(((struct sockaddr_in*)sa)->sin_addr);
 }
+
+
+// -h 143.248.111.222 -p 1234 -o 0 -s 5
+
 
 int main(int argc, char *argv[])
 {
@@ -35,10 +35,35 @@ int main(int argc, char *argv[])
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
+    
+    int port;
+    int option;
+    int shift;
+    char *host;
 
-    if (argc != 2) {
-        fprintf(stderr,"usage: client hostname\n");
-        exit(1);
+    if (argc != 9) { 
+        printf("example usage: ./client -h 143.248.111.222 -p 1234 -o 0 -s 5\n");
+        return 1;
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        switch (argv[i][1]){
+            case 'p':
+                port = atoi(argv[++i]);
+                break;
+            case 'o':
+                option= atoi(argv[++i]);
+                break;
+            case 's':
+                shift = atoi(argv[++i]);
+                break;
+            case 'h':
+                host = argv[++i];
+                break;
+            default:
+                printf("Please provide correct arguments: -h, -p, -o, -s\n");
+                return 1;
+        }
     }
 
     memset(&hints, 0, sizeof hints);
@@ -72,9 +97,7 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
-            s, sizeof s);
-    printf("client: connecting to %s\n", s);
+    printf("client: connecting to server \n");
 
     freeaddrinfo(servinfo); // all done with this structure
 

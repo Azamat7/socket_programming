@@ -33,14 +33,12 @@ void sigchld_handler(int s)
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
 {
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+    return &(((struct sockaddr_in*)sa)->sin_addr);
 }
 
-int main(void)
+// $ ./server -p 1234
+
+int main(int argc, char *argv[])
 {
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *p;
@@ -50,6 +48,19 @@ int main(void)
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
+    int port;
+
+    if (argc != 3) { 
+        printf("Usage: ./server -p PORT_NUMBER\n");
+        return 1;
+    }
+
+    if (strcmp( argv[1], "-p") == 0) {
+        port = atoi(argv[2]);
+    } else {
+        printf("Please provide port number in the correct format: ./server -p PORT_NUMBER\n");
+        return 1;
+    }
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -114,10 +125,7 @@ int main(void)
             continue;
         }
 
-        inet_ntop(their_addr.ss_family,
-            get_in_addr((struct sockaddr *)&their_addr),
-            s, sizeof s);
-        printf("server: got connection from %s\n", s);
+        printf("server: got connection from the client\n");
 
         if (!fork()) { // this is the child process
             close(sockfd); // child doesn't need the listener
