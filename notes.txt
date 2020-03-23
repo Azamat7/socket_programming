@@ -4,3 +4,7 @@ docker exec -it ubuntu bash
 
 apt update
 apt-get install gcc
+
+
+./client -h 143.248.57.29 -p 12001 -o 0 -s 5 < sample.txt 
+./server -p 12001
