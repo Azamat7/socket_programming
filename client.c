@@ -79,6 +79,11 @@ void *get_in_addr(struct sockaddr *sa)
 // 	return ~sum;
 // }
 
+void split_length(uint32_t length, uint16_t* ua, uint16_t* ub){
+    *ua = (uint16_t) (length >> 16);
+    *ub = (uint16_t) (length & 0x0000FFFFuL);
+}
+
 
 // -h 143.248.111.222 -p 1234 -o 0 -s 5
 
@@ -121,23 +126,17 @@ int main(int argc, char *argv[])
         }
     }
 
-    // int pSize = sysconf(_SC_PAGESIZE);
-    // char *buffer = calloc(pSize, sizeof(char));
-    // char *buffer = calloc(MAXDATASIZE, sizeof(char));
-    // char buffer[MAXDATASIZE];
-    // assert(buffer);
+    uint16_t *message = malloc(MAXDATASIZE);
+    uint16_t *mp = message;
+    *mp = htons(5); ++mp;
+    *mp = htons(0); ++mp;
+    *mp = htons(0); ++mp; //length
+    *mp = htons(0); ++mp; //length
 
-    char *message = (char*) malloc(MAXDATASIZE * sizeof(char));
-
-    // checksum1(const char *buf, unsigned size)
-
-    // 1008
-    memcpy(message, "\1\5\1\2\0\3\15\0", 8);
-    char *buffer = (char*) malloc(1000 * sizeof(char));
-    // size = strlen(send_message + 4) + 1;
+    uint16_t *buffer = malloc(1000);
 
     int n;
-    int length = 8;
+    uint32_t length = 8;
     do {
         n = read(0, buffer, 1000);
 
@@ -147,13 +146,24 @@ int main(int argc, char *argv[])
         }
 
         length += n;
-        strncat(message, buffer, n);
-        // process it
-    } while(n > 0);
-    // return 0;
 
-    printf("%s\n\n", message);
-    printf("%lu\n\n", strlen(message));
+        for (int i = 0; i < n; i++) {
+		    *mp = buffer[i]; ++mp;
+	    }
+
+    } while(n > 0);
+
+    uint16_t ua, ub;
+    split_length(length, &ua, &ub);
+    uint16_t *mpl = message;
+    ++mpl; ++mpl;
+    *mpl = htons(ua); ++mpl; //length
+    *mpl = htons(ub); ++mpl; //length
+
+    for (int i=0; i<504; i++){
+        printf("%d", message[i]);
+    }
+    // printf("%lu\n\n", strlen(message));
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -189,29 +199,34 @@ int main(int argc, char *argv[])
     printf("client: connecting to server \n");
 
     freeaddrinfo(servinfo); // all done with this structure
-
-    printf("buffer size: %lu\n", strlen(buffer));
     
-    uint32_t *pp = malloc(1008);
-	uint32_t *qq = pp;
-	
-	*qq = htonl((0 << 0) + (5 << 16)); ++qq;
-    // *qq = htonl(327680); ++qq;
-	*qq = htonl(1008); ++qq;
 
-    // for (int i=0; i<100; i++){
+
+    // uint16_t *pp = malloc(1008);
+	// uint16_t *qq = pp;
+	
+	// // *qq = htonl((0 << 0) + (5 << 16)); ++qq;
+    // *qq = htons(5); ++qq;
+    // *qq = htons(0); ++qq;
+
+    // uint32_t lengthh = 1008;
+    // uint16_t ua, ub;
+    // split_length(lengthh, &ua, &ub);
+
+    // *qq = htons(ua); ++qq;
+    // *qq = htons(ub); ++qq;
+
+	// for (int i = 0; i < 500; i++) {
+	// 	*qq = htons((65 << 0) + (66 << 8)); ++qq;
+	// }
+    
+    // for (int i=0; i<504; i++){
     //     printf("%d", pp[i]);
     // }
-    printf("\n");
 
-	for (int i = 0; i < 250; i++) {
-		*qq = htonl((65 << 0) + (65 << 8) + (65 << 16) + (65 << 24)); ++qq;
-	}
-    
-    for (int i=0; i<252; i++){
-        printf("%d", pp[i]);
-    }
-    send(sockfd , pp , 1008 , 0 ); 
+    // send(sockfd , pp , 1008 , 0 ); 
+
+    send(sockfd, message, length, 0);
     
     // send(sockfd , message , strlen(message) , 0 ); 
 
@@ -221,10 +236,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // return -1;
-    // for (int i=0; i<100; i++){
-    //     printf("%c\n", buf[i]);
-    // }
 
     printf("\n numbytes: %d\n", numbytes);
     buf[numbytes] = '\0';
