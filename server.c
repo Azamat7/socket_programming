@@ -15,9 +15,10 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define PORT "3490"  // the port users will be connecting to
+#include "utils.h"
 
 #define BACKLOG 10   // how many pending connections queue will hold
+#define MAXDATASIZE 10 * 1000 * 1000 - 8// max number of bytes we can get at once 
 
 void sigchld_handler(int s)
 {
@@ -48,8 +49,9 @@ int main(int argc, char *argv[])
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
-    int port;
-    char buffer[1024 * 1000] = {0}; 
+    char *port;
+    char *header = malloc(8);
+    char *buffer = malloc(MAXDATASIZE); 
 
     if (argc != 3) { 
         printf("Usage: ./server -p PORT_NUMBER\n");
@@ -57,7 +59,7 @@ int main(int argc, char *argv[])
     }
 
     if (strcmp( argv[1], "-p") == 0) {
-        port = atoi(argv[2]);
+        port = argv[2];
     } else {
         printf("Please provide port number in the correct format: ./server -p PORT_NUMBER\n");
         return 1;
@@ -68,7 +70,7 @@ int main(int argc, char *argv[])
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
@@ -131,11 +133,50 @@ int main(int argc, char *argv[])
         if (!fork()) { // this is the child process
             close(sockfd); // child doesn't need the listener
 
-            int valread;
-            valread = read(new_fd , buffer, 1024 * 1000); 
-            printf("%s\n",buffer ); 
+            int valread, header_length;
+            header_length = read(new_fd , header, 8);
+
+            uint16_t checksum = ((uint16_t *)header)[1];
+            printf("\nserver checsum: %d\n", checksum);
+
+            uint32_t length = ntohl(((uint32_t *)header)[1]);
+            printf("\nlength: %d\n", length);
+
+            // for (int i=0; i<8; i++){
+            //     printf("%d", ntohs(header[i]));
+            // }
+
+            int operation = header[0];
+            int shift = header[1];
+
+            valread = read(new_fd , buffer, MAXDATASIZE); 
+            for (int i=0; i<valread; i++){
+                printf("%c", buffer[i]);
+            }
+
+            int16_t *hp = (int16_t *)header;
+            ++hp; *hp = 0;
+            uint16_t checksumValid = checksum2(header, (char *)buffer, length - 8);
+            printf("\nvalid checksum: %d\n", checksumValid);
+
+            cipher(buffer, operation, shift, valread);
+            for (int i=0; i<valread; i++){
+                printf("%c", buffer[i]);
+            }
+            uint16_t new_checksum = checksum2((char *)header, buffer, valread);
+            printf("\nnew checksum: %d\n", new_checksum);
+            uint16_t *bp = (uint16_t *)header; ++bp;
+            *bp = new_checksum; ++bp;
+            char * message = malloc(8 + valread);
+            for (int i=0; i<8; i++){
+                message[i] = header[i];
+            }
+            for (int i=8; i<(valread+8); i++){
+                message[i] = buffer[i-8];
+            }
             
-            if (send(new_fd, "Hello, world!", 13, 0) == -1)
+
+            if (send(new_fd, message, valread+8, 0) == -1)
                 perror("send");
 
             close(new_fd);

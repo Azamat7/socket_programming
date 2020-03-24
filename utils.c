@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdio.h>
+#include <ctype.h>
 #include "utils.h"
 
 void split_length(uint32_t length, uint16_t* ua, uint16_t* ub){
@@ -64,4 +66,20 @@ unsigned short checksum2(const char *header, const char *buf, unsigned size)
 
 	/* Invert to get the negative in ones-complement arithmetic */
 	return ~sum;
+}
+
+void cipher(char *text, int op, int shift, int length){
+    int s;
+    if (op == 0){
+        s = shift;
+    }else{
+        s = 26 - op * shift;
+    }
+    char arr[26] = "abcdefghijklmnopqrstuvwxyz";
+
+    for (int i=0; i<length; i++){
+        if (isalpha(text[i]) != 0){ 
+            text[i] = arr[ ( (tolower(text[i]) - 'a' + s) % 26) ];
+        };
+    }
 }

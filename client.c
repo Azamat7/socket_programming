@@ -19,8 +19,7 @@
 
 #define PORT "3490" // the port client will be connecting to 
 
-#define MAXDATASIZEIN 100 // max number of bytes we can get at once 
-#define MAXDATASIZE 10 * 1000 * 1000
+#define MAXDATASIZE 10 * 1000 * 1000// max number of bytes we can get at once 
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -32,7 +31,7 @@ void *get_in_addr(struct sockaddr *sa)
 int main(int argc, char *argv[])
 {
     int sockfd, numbytes;  
-    char *buf = malloc(MAXDATASIZE);
+    char *buf = malloc(MAXDATASIZE-8);
     char *header = malloc(8);
     struct addrinfo hints, *servinfo, *p;
     int rv;
@@ -57,7 +56,7 @@ int main(int argc, char *argv[])
                 operation = atoi(argv[++i]);
                 break;
             case 's':
-                shift = atoi(argv[++i]);
+                shift = (atoi(argv[++i]) % 26 + 26) % 26;
                 break;
             case 'h':
                 host = argv[++i];
@@ -70,7 +69,8 @@ int main(int argc, char *argv[])
 
     uint16_t *message = malloc(MAXDATASIZE);
     uint16_t *mp = message;
-    *mp = htons(5); ++mp;
+    //
+    *mp = htons(256 * operation + shift); ++mp;
     *mp = htons(0); ++mp;
     *mp = htons(0); ++mp; //length
     *mp = htons(0); ++mp; //length
@@ -167,6 +167,11 @@ int main(int argc, char *argv[])
     ++hp; *hp = 0;
     uint16_t checksumValid = checksum2(header, (char *)buf, length - 8);
     printf("\nvalid checksum: %d\n", checksumValid);
+
+    if (schecksum != checksumValid){
+        printf("\nchecksum not valid\n");
+        // return -1;
+    }
 
     printf("\n numbytes: %d\n", numbytes);
     buf[numbytes] = '\0';
