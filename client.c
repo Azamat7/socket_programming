@@ -31,6 +31,7 @@ void *get_in_addr(struct sockaddr *sa)
 int main(int argc, char *argv[])
 {
     int sockfd, numbytes;  
+    char *output = malloc(MAXDATASIZE-8);
     char *buf = malloc(MAXDATASIZE-8);
     char *header = malloc(8);
     struct addrinfo hints, *servinfo, *p;
@@ -151,32 +152,62 @@ int main(int argc, char *argv[])
     
     send(sockfd, message, length, 0);
 
-    recv(sockfd, header, 8, 0);
-    uint16_t schecksum = ((uint16_t *)header)[1];
-    printf("\nserver checsum: %d\n", schecksum);
 
-    uint32_t lengthtr = ntohl(((uint32_t *)header)[1]);
-    printf("\nlength: %d\n", lengthtr);
+    char * header_buffer = malloc(8);
+    int received_bytes;
+    int header_bytes = 0;
+    int output_bytes = 0;
+    while (header_bytes < 8){
+        received_bytes = recv(sockfd, header_buffer, 8, 0);
+        if ((header_bytes + received_bytes) >= 8){
+            for (int i=header_bytes; i<8; i++){
+                header[i] = header_buffer[i-header_bytes];
+            }
+            for (int i=0; i<(received_bytes+header_bytes-8); i++){
+                output[i] = header_buffer[8-header_bytes+i];
+            }
+            output_bytes = received_bytes-8+header_bytes;
+            header_bytes = 8;
+        }else{
+            for (int i=0; i<received_bytes; i++){
+                header[header_bytes + i] = header_buffer[i];
+            }
+            header_bytes += received_bytes;
+        }
+    }
 
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-8, 0)) == -1) {
-        perror("recv");
-        exit(1);
+    
+    
+    uint16_t server_checksum = ((uint16_t *)header)[1];
+    printf("\nserver checsum: %d\n", server_checksum);
+
+    uint32_t length_text = ntohl(((uint32_t *)header)[1]);
+    printf("\nlength: %d\n", length_text);
+
+    while (output_bytes < (length_text - 8)){
+        if ((received_bytes = recv(sockfd, buf, MAXDATASIZE-8, 0)) == -1) {
+            perror("recv");
+            exit(1);
+        }
+        for (int i=0; i<received_bytes; i++){
+            output[output_bytes + i] = buf[i];
+        }
+        output_bytes += received_bytes;
     }
     
     int16_t *hp = (int16_t *)header;
     ++hp; *hp = 0;
-    uint16_t checksumValid = checksum2(header, (char *)buf, length - 8);
+    uint16_t checksumValid = checksum2(header, (char *)output, length_text - 8);
     printf("\nvalid checksum: %d\n", checksumValid);
 
-    if (schecksum != checksumValid){
+    if (server_checksum != checksumValid){
         printf("\nchecksum not valid\n");
-        // return -1;
+        return -1;
     }
 
-    printf("\n numbytes: %d\n", numbytes);
-    buf[numbytes] = '\0';
-
-    printf("\nclient: received '%s'\n",buf);
+    printf("\n numbytes: %d\n", output_bytes);
+    buf[output_bytes] = '\0';
+    printf("\nclient: received '%s'\n", output);
 
     close(sockfd);
 
