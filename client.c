@@ -26,58 +26,32 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in*)sa)->sin_addr);
 }
 
-// void itos(int n, char * &s) { // works for positive numbers
-// 	char **p = &s;
 
-// 	while (1) {
-// 		*p = n % 10;
-// 		n /= 10;
-		
-// 		p++;
-		
-// 		if (n == 0) {
-// 			break;
-// 		}
-// 	}
-	
-// 	*p = '\0';
-// 	p--;
-	
-// 	char ** q = &s;
-	
-// 	while (q <= p) {
-// 		swap(*q, *p);
-// 		q++;
-// 		p--;
-// 	}
-// }
+unsigned short checksum1(const char *buf, unsigned size)
+{
+	unsigned sum = 0;
+	int i;
 
+	/* Accumulate checksum */
+	for (i = 0; i < size - 1; i += 2)
+	{
+		unsigned short word16 = *(unsigned short *) &buf[i];
+		sum += word16;
+	}
 
-// unsigned short checksum1(const char *buf, unsigned size)
-// {
-// 	unsigned sum = 0;
-// 	int i;
+	/* Handle odd-sized case */
+	if (size & 1)
+	{
+		unsigned short word16 = (unsigned char) buf[i];
+		sum += word16;
+	}
 
-// 	/* Accumulate checksum */
-// 	for (i = 0; i < size - 1; i += 2)
-// 	{
-// 		unsigned short word16 = *(unsigned short *) &buf[i];
-// 		sum += word16;
-// 	}
+	/* Fold to get the ones-complement result */
+	while (sum >> 16) sum = (sum & 0xFFFF)+(sum >> 16);
 
-// 	/* Handle odd-sized case */
-// 	if (size & 1)
-// 	{
-// 		unsigned short word16 = (unsigned char) buf[i];
-// 		sum += word16;
-// 	}
-
-// 	/* Fold to get the ones-complement result */
-// 	while (sum >> 16) sum = (sum & 0xFFFF)+(sum >> 16);
-
-// 	/* Invert to get the negative in ones-complement arithmetic */
-// 	return ~sum;
-// }
+	/* Invert to get the negative in ones-complement arithmetic */
+	return ~sum;
+}
 
 void split_length(uint32_t length, uint16_t* ua, uint16_t* ub){
     *ua = (uint16_t) (length >> 16);
@@ -91,7 +65,7 @@ void split_length(uint32_t length, uint16_t* ua, uint16_t* ub){
 int main(int argc, char *argv[])
 {
     int sockfd, numbytes;  
-    char buf[1200];
+    char *buf = malloc(MAXDATASIZE);
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
@@ -156,9 +130,16 @@ int main(int argc, char *argv[])
     uint16_t ua, ub;
     split_length(length, &ua, &ub);
     uint16_t *mpl = message;
-    ++mpl; ++mpl;
+    ++mpl;++mpl;
     *mpl = htons(ua); ++mpl; //length
     *mpl = htons(ub); ++mpl; //length
+
+    uint16_t *mplc = message;
+    ++mplc;
+    uint16_t checksum = checksum1((char *) message, length);
+    printf("\nchecksum: %d\n", checksum);
+    *mplc = checksum; ++mpl;
+    
 
     for (int i=0; i<504; i++){
         printf("%d", message[i]);
@@ -200,38 +181,10 @@ int main(int argc, char *argv[])
 
     freeaddrinfo(servinfo); // all done with this structure
     
-
-
-    // uint16_t *pp = malloc(1008);
-	// uint16_t *qq = pp;
-	
-	// // *qq = htonl((0 << 0) + (5 << 16)); ++qq;
-    // *qq = htons(5); ++qq;
-    // *qq = htons(0); ++qq;
-
-    // uint32_t lengthh = 1008;
-    // uint16_t ua, ub;
-    // split_length(lengthh, &ua, &ub);
-
-    // *qq = htons(ua); ++qq;
-    // *qq = htons(ub); ++qq;
-
-	// for (int i = 0; i < 500; i++) {
-	// 	*qq = htons((65 << 0) + (66 << 8)); ++qq;
-	// }
-    
-    // for (int i=0; i<504; i++){
-    //     printf("%d", pp[i]);
-    // }
-
-    // send(sockfd , pp , 1008 , 0 ); 
-
     send(sockfd, message, length, 0);
-    
-    // send(sockfd , message , strlen(message) , 0 ); 
 
     recv(sockfd, buf, 8, 0);
-    if ((numbytes = recv(sockfd, buf, 1100, 0)) == -1) {
+    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-8, 0)) == -1) {
         perror("recv");
         exit(1);
     }
