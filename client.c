@@ -15,6 +15,8 @@
 
 #include <arpa/inet.h>
 
+#include "utils.h"
+
 #define PORT "3490" // the port client will be connecting to 
 
 #define MAXDATASIZEIN 100 // max number of bytes we can get at once 
@@ -26,46 +28,12 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in*)sa)->sin_addr);
 }
 
-
-unsigned short checksum1(const char *buf, unsigned size)
-{
-	unsigned sum = 0;
-	int i;
-
-	/* Accumulate checksum */
-	for (i = 0; i < size - 1; i += 2)
-	{
-		unsigned short word16 = *(unsigned short *) &buf[i];
-		sum += word16;
-	}
-
-	/* Handle odd-sized case */
-	if (size & 1)
-	{
-		unsigned short word16 = (unsigned char) buf[i];
-		sum += word16;
-	}
-
-	/* Fold to get the ones-complement result */
-	while (sum >> 16) sum = (sum & 0xFFFF)+(sum >> 16);
-
-	/* Invert to get the negative in ones-complement arithmetic */
-	return ~sum;
-}
-
-void split_length(uint32_t length, uint16_t* ua, uint16_t* ub){
-    *ua = (uint16_t) (length >> 16);
-    *ub = (uint16_t) (length & 0x0000FFFFuL);
-}
-
-
 // -h 143.248.111.222 -p 1234 -o 0 -s 5
-
-
 int main(int argc, char *argv[])
 {
     int sockfd, numbytes;  
     char *buf = malloc(MAXDATASIZE);
+    char *header = malloc(8);
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
@@ -183,12 +151,22 @@ int main(int argc, char *argv[])
     
     send(sockfd, message, length, 0);
 
-    recv(sockfd, buf, 8, 0);
+    recv(sockfd, header, 8, 0);
+    uint16_t schecksum = ((uint16_t *)header)[1];
+    printf("\nserver checsum: %d\n", schecksum);
+
+    uint32_t lengthtr = ntohl(((uint32_t *)header)[1]);
+    printf("\nlength: %d\n", lengthtr);
+
     if ((numbytes = recv(sockfd, buf, MAXDATASIZE-8, 0)) == -1) {
         perror("recv");
         exit(1);
     }
-
+    
+    int16_t *hp = (int16_t *)header;
+    ++hp; *hp = 0;
+    uint16_t checksumValid = checksum2(header, (char *)buf, length - 8);
+    printf("\nvalid checksum: %d\n", checksumValid);
 
     printf("\n numbytes: %d\n", numbytes);
     buf[numbytes] = '\0';
